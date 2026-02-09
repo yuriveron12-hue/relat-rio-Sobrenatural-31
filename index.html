@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Relatório de Atendimento - Edição 31</title>
+  <title>Relatório - Edição 31</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#ffffff" />
   <style>
-    :root { --line:#222; --muted:#444; }
+    :root { --line:#222; }
     body { font-family: Arial, Helvetica, sans-serif; background:#f3f3f3; margin:0; }
     .topbar{
       position: sticky; top:0; z-index:10;
@@ -44,23 +44,22 @@
       background-size: 100% 33px;
       min-height: 360px;
     }
-    .list{
-      display:grid; gap:10px; margin-top:6px;
-    }
+    .list{ display:grid; gap:10px; margin-top:6px; }
     .list .item{ display:flex; gap:8px; align-items:center; }
     .x{ width:16px; text-align:center; font-weight:700; }
     .line-input{
       width:100%; border:none; border-bottom:2px solid var(--line);
       padding:6px 4px; font-size:14px; outline:none;
     }
-
+    .hint{
+      width:min(820px, 100%); margin:0 auto 14px; padding:10px 14px;
+      color:#111; font-size:13px;
+    }
+    .hint b{ font-weight:800; }
     @media print{
       body{ background:#fff; }
-      .topbar{ display:none !important; }
+      .topbar,.hint{ display:none !important; }
       .page{ box-shadow:none; margin:0; border-radius:0; width:auto; }
-      textarea{
-        background-image: linear-gradient(to bottom, transparent 31px, rgba(0,0,0,.55) 32px, transparent 33px);
-      }
     }
   </style>
 </head>
@@ -69,7 +68,13 @@
     <button class="primary" onclick="saveForm()">Salvar</button>
     <button onclick="loadForm()">Carregar</button>
     <button onclick="clearForm()">Limpar</button>
-    <button class="primary" onclick="exportPDF()">Gerar PDF (Imprimir)</button>
+    <button class="primary" onclick="exportPDF()">Gerar PDF</button>
+    <button onclick="shareSummary()">Compartilhar</button>
+  </div>
+
+  <div class="hint" id="hintBox" style="display:none;">
+    ✅ PDF pronto. Agora escolha <b>Salvar como PDF</b> e toque em <b>Salvar</b>.
+    O nome sugerido do arquivo será o título do documento.
   </div>
 
   <div class="page" id="printArea">
@@ -90,8 +95,8 @@
       </div>
 
       <div class="checks">
-        <label><input id="tipoNatural" type="radio" name="tipo" value="Natural"> Natural</label>
-        <label><input id="tipoSobrenatural" type="radio" name="tipo" value="Sobrenatural"> Sobrenatural</label>
+        <label><input type="radio" name="tipo" value="Natural"> Natural</label>
+        <label><input type="radio" name="tipo" value="Sobrenatural"> Sobrenatural</label>
       </div>
     </div>
 
@@ -122,8 +127,8 @@
     <div class="row" style="margin-top:18px;">
       <div class="checks" style="flex:1;">
         <div class="label" style="font-weight:700;">Tomou Medicação:</div>
-        <label><input id="medSim" type="radio" name="med" value="Sim"> Sim</label>
-        <label><input id="medNao" type="radio" name="med" value="Não"> Não</label>
+        <label><input type="radio" name="med" value="Sim"> Sim</label>
+        <label><input type="radio" name="med" value="Não"> Não</label>
       </div>
       <div class="field" style="flex:2; min-width:260px;">
         <div class="label">Qual:</div>
@@ -150,7 +155,8 @@
       window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
     }
 
-    const KEY = "relatorio_ed31_v1";
+    const KEY = "relatorio_ed31_v2";
+    const originalTitle = document.title;
 
     function getFormData(){
       const tipo = document.querySelector('input[name="tipo"]:checked')?.value || "";
@@ -200,10 +206,39 @@
       if(!confirm("Limpar tudo?")) return;
       setFormData({});
       localStorage.removeItem(KEY);
+      document.title = originalTitle;
+      document.getElementById("hintBox").style.display = "none";
+    }
+
+    function buildSuggestedName(){
+      const d = v("data") || "sem-data";
+      const nome = (v("nome") || "sem-nome").trim().replace(/\s+/g,'_');
+      const tipo = document.querySelector('input[name="tipo"]:checked')?.value || "Tipo";
+      return `Relatorio_Ed31_${d}_${tipo}_${nome}`.replace(/[\\/:*?"<>|]+/g,'-');
     }
 
     function exportPDF(){
+      document.title = buildSuggestedName();
+      document.getElementById("hintBox").style.display = "block";
       window.print();
+    }
+
+    async function shareSummary(){
+      const data = getFormData();
+      const resumo =
+`Relatório Atendimento Sobrenatural - Edição 31
+Data: ${data.data || "-"}  Horário: ${data.hora || "-"}
+Tipo: ${data.tipo || "-"}
+Nome: ${data.nome || "-"}  Idade: ${data.idade || "-"}
+Responsável: ${data.responsavel || "-"}`;
+
+      if (navigator.share) {
+        try { await navigator.share({ title: "Relatório - Edição 31", text: resumo, url: location.href }); }
+        catch (e) {}
+      } else {
+        await navigator.clipboard.writeText(resumo + "\n" + location.href);
+        alert("Resumo copiado ✅ (cole no WhatsApp).");
+      }
     }
 
     function v(id){ return document.getElementById(id).value; }
